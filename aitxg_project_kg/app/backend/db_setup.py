@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 #Later, we can replace this with a PostgreSQL URL
 DATABASE_URL = "sqlite:///./test.db"
 
-#Connection to database, 
+#Connection to database
 database = Database(DATABASE_URL) 
 
 #SQLAlchemy engine, the engine allows us to write and execute SQL queries

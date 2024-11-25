@@ -17,6 +17,7 @@ class User(Base):
     #relationship indicates "Recipe" class is child of "user" 
     #cascade means that all child recipes of a user will be deleted when that user is deleted
     recipes = relationship("Recipe", back_populates="user", cascade="all, delete-orphan")
+    #cascade... this picks one database if there are still multiple databases
 
 class Recipe(Base):
     __tablename__ = "recipes"
@@ -29,5 +30,7 @@ class Recipe(Base):
     time_saved = Column(TIMESTAMP, default=func.current_timestamp())
 
     #relationship indicates "User" class is parent of "recipes"
+    #1 user cannot have replica recipes
     user = relationship("User", back_populates="recipes")
+
 
