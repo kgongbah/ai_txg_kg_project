@@ -1,7 +1,7 @@
 #models.py defines the schemas using SQLalchemy
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, TIMESTAMP, BLOB
 from sqlalchemy.orm import relationship
-from db_setup import Base
+from .db_setup import Base
 from sqlalchemy.sql import func #for time_created
 
 class User(Base):
