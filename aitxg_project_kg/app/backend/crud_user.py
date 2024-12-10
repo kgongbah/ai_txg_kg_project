@@ -18,6 +18,10 @@ def get_user_by_id(db: Session, user_id: int):
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
 
+#Read user by username
+def get_user_by_username(db: Session, username: str):
+    return db.query(User).filter(User.username == username).first()
+
 #Read all users
 def get_all_users(db: Session):
     return db.query(User).all()
@@ -39,6 +43,7 @@ def delete_user_by_id(db: Session, user_id: int):
     if user_to_delete: 
         db.delete(user_to_delete)
         db.commit()
+    else: print(f"User with user_id {user_id} not found.")
     return user_to_delete
 
 
