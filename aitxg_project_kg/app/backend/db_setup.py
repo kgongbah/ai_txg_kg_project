@@ -21,3 +21,11 @@ Base = declarative_base(metadata=MetaData())
 
 #Session for interacting with database
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+#Retrieve dependency for daabase sessions
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

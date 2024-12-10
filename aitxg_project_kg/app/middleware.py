@@ -23,7 +23,7 @@ class CustomMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         #define the process time
-        process_time = time.time() - start_time()
+        process_time = time.time() - start_time
 
         #log response status and time
         logging.info(f"Response Status: {response.status_code} - Process Time: {process_time:.2f}s")
