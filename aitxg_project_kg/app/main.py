@@ -52,7 +52,7 @@ async def read_existing_user(user_id: int, db: Session = Depends(get_db)):
     user_to_read = get_user_by_id(db, user_id) 
     if not user_to_read:
         raise HTTPException(status_code=404, detail="User to read not found.")
-    print(f"user_id: {user_to_read.user_id}, username: {user_to_read.username}, email: {user_to_read.email}")
+    print(f"Read user: user_id: {user_to_read.user_id}, username: {user_to_read.username}, email: {user_to_read.email}")
     return UserResponse.from_orm(user_to_read)
 
 #Update existing user by user_id
@@ -74,7 +74,7 @@ async def update_existing_user(user_id: int, user_update: UserUpdate, db: Sessio
     #Check if user was updated successfully.
     if not updated_user:
         raise HTTPException(status_code=400, detail="Unable to update user.")
-
+    print(f"User with user_id {user_id} updated - username: {updated_user.username} - email: {updated_user.email} - password: {updated_user.email}")
     return UserResponse.from_orm(updated_user)
 
 #Delete existing user by user_id
@@ -86,6 +86,7 @@ async def delete_existing_user(user_id: int, db: Session = Depends(get_db)):
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User to delete not found.")
     
+    print(f"User with user_id {user_id} deleted - username: {user_to_delete.username} - email: {user_to_delete.email} - password: {user_to_delete.email}")
     return UserResponse.from_orm(user_to_delete)
     
 
@@ -94,16 +95,17 @@ Demo steps:
 1. Delete test.db and launch app: uvicorn main:app --host 0.0.0.0 --port 80
 2. Go to http://localhost:80/docs
 3. Add a new user
-4. Kill the app (CTRL+C) and follow commands:
+4. Try adding a new user with the same username -> look at error message
+5. Try adding a new user with the same email -> look at error message
+6. Add a second user with a unique username and email
+7. Kill the app (CTRL+C) and follow commands:
     1. sqlite3
     2. .open test.db
     3. select * from users;
-5. You should be able to see your new user
-6. .exit and run app again: uvicorn main:app --host 0.0.0.0 --port 80
-7. Try the same process with a new user with the same username
-8. Try the same process with a new user with a different username
-7. Try to update user where user_id = 1
-8. Try to delete user where user_id = 1
+8. You should be able to see your new users
+9. .exit and run app again: uvicorn main:app --host 0.0.0.0 --port 80
+10. Try to update user where user_id = 1, change username, set email and password to null
+11. Try to delete user where user_id = 1
 """
 
 
