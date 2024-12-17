@@ -24,13 +24,27 @@ class Recipe(Base):
 
     recipe_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
-    recipe_text = Column(Text)
-    ingredients_text = Column(Text)
-    image = Column(BLOB)
+    recipe_name = Column(Text, unique=True)
+    specifications_text = Column(Text)
+    recipe_output = Column(Text)
+    file_url = Column(String, nullable=False) #It is better practice to store the image's url rather than its byte encoding 
     time_saved = Column(TIMESTAMP, default=func.current_timestamp())
 
-    #relationship indicates "User" class is parent of "recipes"
-    #1 user cannot have replica recipes
+    #a recipe belongs to one user
     user = relationship("User", back_populates="recipes")
 
+    recipe_additional_texts = relationship("RecipeAdditionalText", back_populates="recipe", cascade="all, delete-orphan")
 
+#A recipe can have an unlimited number of additional prompts to the model and responses
+#from the model. Each prompt-response pair is stored in this database
+class RecipeAdditionalText(Base):
+    __tablename__ = "recipe_additional_texts"
+
+    recipe_text_id = Column(Integer, primary_key=True, autoincrement=True)
+    recipe_id = Column(Integer, ForeignKey('recipes.recipe_id'), nullable=False)
+    prompt = Column(Text, nullable=False)
+    response = Column(Text, nullable=False)
+    time_saved = Column(TIMESTAMP, default=func.current_timestamp())
+
+    #A recipe text belongs to one recipe
+    recipe = relationship("Recipe", back_populates="recipe_additional_texts")

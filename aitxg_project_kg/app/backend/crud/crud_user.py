@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from .models import User
+from ..models import User
 from datetime import datetime
 
 #Create new user
@@ -40,10 +40,10 @@ def update_user_by_id(db: Session, user_id: int, username: str = None, email: st
 #Delete user by user_id
 def delete_user_by_id(db: Session, user_id: int):
     user_to_delete = db.query(User).filter(User.user_id == user_id).first()
+    print("Here")
     if user_to_delete: 
         db.delete(user_to_delete)
         db.commit()
-    else: print(f"User with user_id {user_id} not found.")
     return user_to_delete
 
 

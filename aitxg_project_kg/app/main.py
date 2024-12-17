@@ -1,18 +1,15 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Form, staticfiles
 from sqlalchemy.orm import Session
 from backend.db_setup import engine, database, get_db
 from backend.models import Base, User
-from backend.crud_user import (
-    get_user_by_id, 
-    get_user_by_email,
-    get_user_by_username,
-    get_all_users, 
-    create_user, 
-    update_user_by_id, 
-    delete_user_by_id)
+import backend.crud.crud_user as crud_user
+import backend.crud.crud_recipe as crud_recipe
 from middleware import CustomMiddleware
-from backend.schemas import UserCreate, UserResponse, UserUpdate
+from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate
 from datetime import datetime
+from typing import Optional
+import io
+from uuid import uuid4
 
 #Initialize the database
 print("Initializing the database...")
@@ -25,6 +22,9 @@ except Exception as e:
 #Initialize FastAPI app
 app = FastAPI()
 
+# Serve the /static directory
+app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
+
 #Add your custom middleware
 app.add_middleware(CustomMiddleware)
 
@@ -33,23 +33,27 @@ app.add_middleware(CustomMiddleware)
 async def read_root():
     return {"message": "Welcome to Kenny's AITXG project."}
 
+##########################################################################################
+# USER API ROUTES
+##########################################################################################
+
 #Create new user
 @app.post("/users/", response_model=UserResponse)
 async def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user_email = get_user_by_email(db, user.email)
-    existing_user_username = get_user_by_username(db, user.username)
+    existing_user_email = crud_user.get_user_by_email(db, user.email)
+    existing_user_username = crud_user.get_user_by_username(db, user.username)
     if existing_user_email:
         raise HTTPException(status_code=400, detail="User with this email already registered.")
     elif existing_user_username:
         raise HTTPException(status_code=400, detail="User with this username already registered.")
-    new_user = create_user(db, user.username, user.email, user.password, datetime.now())
+    new_user = crud_user.create_user(db, user.username, user.email, user.password, datetime.now())
     print(f"New user created: user_id: {new_user.user_id}, username: {new_user.username}, email: {new_user.email}")
     return UserResponse.from_orm(new_user)
 
 #Read existing user by user_id
 @app.get("/users/{user_id}", response_model=UserResponse)
 async def read_existing_user(user_id: int, db: Session = Depends(get_db)):
-    user_to_read = get_user_by_id(db, user_id) 
+    user_to_read = crud_user.get_user_by_id(db, user_id) 
     if not user_to_read:
         raise HTTPException(status_code=404, detail="User to read not found.")
     print(f"Read user: user_id: {user_to_read.user_id}, username: {user_to_read.username}, email: {user_to_read.email}")
@@ -57,14 +61,14 @@ async def read_existing_user(user_id: int, db: Session = Depends(get_db)):
 
 #Update existing user by user_id
 @app.put("/users/{user_id}", response_model=UserResponse)
-async def update_existing_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
+async def update_existing_user(user_update: UserUpdate, user_id: int, db: Session = Depends(get_db)):
     #Check if the user exists
-    user_to_update = get_user_by_id(db, user_id)
+    user_to_update = crud_user.get_user_by_id(db, user_id)
     if not user_to_update:
         raise HTTPException(status_code=404, detail="User to update not found.")
     
     #Update the user with new details
-    updated_user = update_user_by_id(
+    updated_user = crud_user.update_user_by_id(
         db, 
         user_id, 
         username=user_update.username, 
@@ -82,13 +86,72 @@ async def update_existing_user(user_id: int, user_update: UserUpdate, db: Sessio
 async def delete_existing_user(user_id: int, db: Session = Depends(get_db)):
 
     #Check if the user to delete exists.
-    user_to_delete = delete_user_by_id(db, user_id)
+    user_to_delete = crud_user.delete_user_by_id(db, user_id)
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User to delete not found.")
     
-    print(f"User with user_id {user_id} deleted - username: {user_to_delete.username} - email: {user_to_delete.email} - password: {user_to_delete.email}")
+    print(f"User with user_id {user_id} deleted - username: {user_to_delete.username} - email: {user_to_delete.email} - password: {user_to_delete.password}")
     return UserResponse.from_orm(user_to_delete)
+
+##########################################################################################
+# RECIPE API ROUTES
+##########################################################################################
     
+#Create a recipe by user_id
+@app.post("/user/{user_id}/recipes/", response_model=RecipeResponse)
+async def create_new_recipe_by_user_id(
+    user_id: int,
+    recipe_name: str = Form(...),
+    specifications_text: Optional[str] = Form(None),
+    #recipe_output: str = Form(...),
+    #time_saved: datetime = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+
+    #Check if the user exists
+    user = crud_user.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Recipe's parent user does not exist.")
+    
+    #Check if the recipe's name has already been used by the user
+    recipe_name_exists = crud_recipe.read_recipe_by_user_id_and_recipe_name(db, user_id, recipe_name)
+    if recipe_name_exists:
+        raise HTTPException(status_code=404, detail=f"User has already created a recipe with this name: {recipe_name}")
+    
+    #Temporary definition for recipe_output. Eventually this will be AWS Sagemaker generated text
+    recipe_output = f"recipe_output for {recipe_name}."
+
+    #Generate a unique filename
+    unique_file_name = f"{uuid4()}_{file.filename}"
+
+    #Specify the path where the file will be saved, used internally by CRUD
+    file_path = f"static/uploads/{unique_file_name}"
+
+    #Specify the file url, used by clients (front-end, APIs)
+    file_url = f"static/uploads/{unique_file_name}"
+
+    #Read the file contents and then save to server's file storage
+    with open(file_path, "wb") as buffer: 
+        buffer.write(await file.read())
+    
+    new_recipe = crud_recipe.create_new_recipe(
+        db = db,
+        user_id=user_id,
+        recipe_name=recipe_name,
+        specifications_text=specifications_text,
+        recipe_output=recipe_output,
+        file_url=file_url,
+        time_saved=datetime.now()
+        )
+    
+    if not new_recipe:
+        raise HTTPException(status_code=500, detail="Error creating new recipe.")
+    else: 
+        print(f"User with user_id {new_recipe.user_id} created recipe - recipe name: {new_recipe.recipe_name} - recipe id: {new_recipe.recipe_id}")
+        return RecipeResponse.from_orm(new_recipe)
+
+
 
 """
 Demo steps:
