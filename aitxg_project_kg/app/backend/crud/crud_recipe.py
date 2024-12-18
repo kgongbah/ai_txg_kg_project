@@ -14,7 +14,6 @@ def create_new_recipe(db: Session, user_id: int, recipe_name: str, specification
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
-    print("Here2")
     return recipe
 
 #Read recipe by recipe_id
@@ -30,11 +29,15 @@ def read_recipe_by_user_id_and_recipe_name(db: Session, user_id: int, recipe_nam
     return db.query(Recipe).filter(Recipe.user_id == user_id, Recipe.recipe_name == recipe_name).first()
     #Note that using python "and" within .filter() is NOT OK!
 
+#Read recipe by user_id and recipe name
+def read_recipe_by_user_id_and_recipe_id(db: Session, user_id: int, recipe_id: int):
+    return db.query(Recipe).filter(Recipe.user_id == user_id, Recipe.recipe_id == recipe_id).first()
+
 #Update recipe by recipe_id
 #This function can only update recipe_name. We cannot update the image or specifications_text.
 #To update recipe_text, see function in crud_recipe_text
-def update_recipe_name_by_recipe_id(db: Session, recipe_id: int, recipe_name: str = None):
-    recipe_to_update = db.query(Recipe).filter(Recipe.recipe_id == recipe_id).first()
+def update_recipe_name_by_user_id_and_recipe_id(db: Session, user_id: int, recipe_id: int, recipe_name: str = None):
+    recipe_to_update = db.query(Recipe).filter(Recipe.user_id == user_id, Recipe.recipe_id == recipe_id).first()
     if recipe_to_update:
         if recipe_name: recipe_to_update.recipe_name = recipe_name
     db.commit()
@@ -42,8 +45,8 @@ def update_recipe_name_by_recipe_id(db: Session, recipe_id: int, recipe_name: st
     return recipe_to_update
 
 #Delete recipe by recipe_id
-def delete_recipe_by_recipe_id(db: Session, recipe_id: int):
-    recipe_to_delete = db.query(Recipe).filter(Recipe.recipe_id == recipe_id).first()
+def delete_recipe_by_user_id_and_recipe_id(db: Session, user_id: int, recipe_id: int):
+    recipe_to_delete = db.query(Recipe).filter(Recipe.user_id == user_id, Recipe.recipe_id == recipe_id).first()
     if recipe_to_delete:
         db.delete(recipe_to_delete)
         db.commit()

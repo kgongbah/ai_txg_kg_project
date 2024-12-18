@@ -7,7 +7,7 @@ import backend.crud.crud_recipe as crud_recipe
 from middleware import CustomMiddleware
 from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import io
 from uuid import uuid4
 
@@ -119,7 +119,8 @@ async def create_new_recipe_by_user_id(
     if recipe_name_exists:
         raise HTTPException(status_code=404, detail=f"User has already created a recipe with this name: {recipe_name}")
     
-    #Temporary definition for recipe_output. Eventually this will be AWS Sagemaker generated text
+    #Temporary definition for recipe_output. 
+    #TODO: Eventually this will be AWS Sagemaker generated text
     recipe_output = f"recipe_output for {recipe_name}."
 
     #Generate a unique filename
@@ -150,6 +151,54 @@ async def create_new_recipe_by_user_id(
     else: 
         print(f"User with user_id {new_recipe.user_id} created recipe - recipe name: {new_recipe.recipe_name} - recipe id: {new_recipe.recipe_id}")
         return RecipeResponse.from_orm(new_recipe)
+    
+#Get recipe by user_id and recipe_id
+@app.get("/users/{user_id}/recipes/{recipe_id}", response_model=RecipeResponse)
+async def read_existing_recipe(user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    recipe_to_read = crud_recipe.read_recipe_by_user_id_and_recipe_id(db, user_id, recipe_id)
+    if not recipe_to_read:
+        raise HTTPException(status_code=404, detail=f"Recipe to read with user_id {user_id} and recipe_id {recipe_id} not found.")
+    print(f"Read recipe: user_id: {recipe_to_read.user_id}, recipe_id: {recipe_to_read.recipe_id}, recipe_name: {recipe_to_read.recipe_name}")
+    return RecipeResponse.from_orm(recipe_to_read)
+
+#Get all of a user's recipe by user_id
+@app.get("/users/{user_id}/recipes", response_model=List[RecipeResponse])
+async def read_all_recipes_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    recipes_to_read = crud_recipe.read_all_recipes_by_user_id(db, user_id)
+    if not recipes_to_read:
+        raise HTTPException(status_code=404, detail=f"User user_id {user_id} has no recipes.")
+    print(f"User with user_id {recipes_to_read[0].user_id} has {len(recipes_to_read)} recipes. The first recipe: recipe_id: {recipes_to_read[0].recipe_id}, recipe_name: {recipes_to_read[0].recipe_name}")
+    return [RecipeResponse.from_orm(recipe) for recipe in recipes_to_read]
+
+#Update existing recipe by recipe_id and user_id
+@app.put("/users/{user_id}/recipes/{recipe_id}", response_model=RecipeResponse)
+async def update_recipe_name_by_user_id_and_recipe_id(recipe_update: RecipeUpdate, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    recipe_to_update = crud_recipe.read_recipe_by_user_id_and_recipe_id(db, user_id, recipe_id)
+    if not recipe_to_update:
+        raise HTTPException(status_code=404, detail=f"Recipe to update with user_id {user_id} and recipe_id {recipe_id} not found.")
+
+    updated_recipe = crud_recipe.update_recipe_name_by_user_id_and_recipe_id(db, user_id, recipe_id, recipe_update.recipe_name)
+
+    #Check if recipe was updated successfully.
+    if not updated_recipe:
+        raise HTTPException(status_code=400, detail="Unable to update recipe.")
+    print(f"User with user_id {user_id} updated recipe with recipe_id {recipe_id}: recipe_name: {updated_recipe.recipe_name}")
+    return RecipeResponse.from_orm(updated_recipe)
+
+#Delete existing recipe by recipe_id and user_id
+@app.delete("/users/{user_id}/recipes/{recipe_id}", response_model=RecipeResponse)
+async def delete_recipe_by_user_id_and_recipe_id(user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    recipe_to_delete = crud_recipe.read_recipe_by_user_id_and_recipe_id(db, user_id, recipe_id)
+    if not recipe_to_delete:
+        raise HTTPException(status_code=404, detail=f"Recipe to delete with user_id {user_id} and recipe_id {recipe_id} not found.")
+    
+    deleted_recipe = crud_recipe.delete_recipe_by_user_id_and_recipe_id(db, user_id, recipe_id)
+
+    if not deleted_recipe:
+        raise HTTPException(status_code=400, detail="Unable to delete recipe.")
+    print(f"User with user_id {user_id} deleted recipe with recipe_id {recipe_id}: recipe_name: {deleted_recipe.recipe_name}")
+    return RecipeResponse.from_orm(deleted_recipe)
+
 
 
 
@@ -171,4 +220,7 @@ Demo steps:
 11. Try to delete user where user_id = 1
 """
 
-
+"""
+TODO:
+1. make it so that when updating a field in users or recipes, the updated field must be different.
+"""
