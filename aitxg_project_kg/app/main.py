@@ -8,7 +8,7 @@ from middleware import CustomMiddleware
 from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate
 from datetime import datetime
 from typing import Optional, List
-import io
+import os
 from uuid import uuid4
 
 #Initialize the database
@@ -85,10 +85,24 @@ async def update_existing_user(user_update: UserUpdate, user_id: int, db: Sessio
 @app.delete("/users/{user_id}", response_model=UserResponse)
 async def delete_existing_user(user_id: int, db: Session = Depends(get_db)):
 
+    #Retrieve all the recipes that the user created, so we can delete their corresponding images
+    user_to_delete_recipes = crud_recipe.read_all_recipes_by_user_id(db, user_id)
+
     #Check if the user to delete exists.
     user_to_delete = crud_user.delete_user_by_id(db, user_id)
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User to delete not found.")
+    
+    for recipe in user_to_delete_recipes:
+        recipe_url_to_delete = recipe.file_url
+        try:
+            if not os.path.exists(recipe_url_to_delete):
+                print(f"Recipe to delete's corresponding image not found: {recipe_url_to_delete}")
+            else:
+                os.remove(recipe_url_to_delete)
+                print(f"Recipe to delete's corresponding image deleted successfully. File's url: {recipe_url_to_delete}")
+        except Exception as e:
+            print(f"Unable to delete recipe's corresponding image: {e}")
     
     print(f"User with user_id {user_id} deleted - username: {user_to_delete.username} - email: {user_to_delete.email} - password: {user_to_delete.password}")
     return UserResponse.from_orm(user_to_delete)
@@ -194,6 +208,19 @@ async def delete_recipe_by_user_id_and_recipe_id(user_id: int, recipe_id: int, d
     
     deleted_recipe = crud_recipe.delete_recipe_by_user_id_and_recipe_id(db, user_id, recipe_id)
 
+    #define the location of the corresponding image for deletion
+    deleted_recipe_file_url = deleted_recipe.file_url
+
+    #Delete the recipe's corresponding image if the recipe is deleted
+    try:
+        if not os.path.exists(deleted_recipe_file_url):
+            print(f"Recipe to delete's corresponding image not found: {deleted_recipe_file_url}")
+        else:
+            os.remove(deleted_recipe_file_url)
+            print(f"Recipe to delete's corresponding image deleted successfully. File's url: {deleted_recipe_file_url}")
+    except Exception as e:
+        print(f"Unable to delete recipe's corresponding image: {e}")
+
     if not deleted_recipe:
         raise HTTPException(status_code=400, detail="Unable to delete recipe.")
     print(f"User with user_id {user_id} deleted recipe with recipe_id {recipe_id}: recipe_name: {deleted_recipe.recipe_name}")
@@ -223,4 +250,5 @@ Demo steps:
 """
 TODO:
 1. make it so that when updating a field in users or recipes, the updated field must be different.
+2. when deleting a recipe (or a user with recipes), delete the image from statick/uploads file
 """
