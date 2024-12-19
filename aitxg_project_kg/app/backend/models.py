@@ -40,7 +40,8 @@ class Recipe(Base):
 class RecipeAdditionalText(Base):
     __tablename__ = "recipe_additional_texts"
 
-    recipe_text_id = Column(Integer, primary_key=True, autoincrement=True)
+    recipe_add_text_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     recipe_id = Column(Integer, ForeignKey('recipes.recipe_id'), nullable=False)
     prompt = Column(Text, nullable=False)
     response = Column(Text, nullable=False)

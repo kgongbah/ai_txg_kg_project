@@ -11,7 +11,7 @@ from fastapi import UploadFile
 class UserBase(BaseModel):
     username: str
     email: EmailStr
-    time_created: datetime
+    #time_created: datetime
 
 class UserCreate(UserBase):
     username: str
@@ -73,5 +73,27 @@ class RecipeResponse(RecipeBase):
 # RECIPE ADDITIONAL TEXT PYDANTIC MODELS
 ##########################################################################################
 
-class RecipeAdditionalText(BaseModel):
-    pass
+class RecipeAddTextBase(BaseModel):
+    prompt: str
+    # response: str
+    # time_saved: datetime
+
+class RecipeAddTextCreate(RecipeAddTextBase):
+    prompt: str
+
+
+class RecipeAddTextUpdate(RecipeAddTextBase):
+    #prompt: str
+    response: str
+
+class RecipeAddTextResponse(RecipeAddTextBase):
+    recipe_add_text_id: int
+    user_id: int
+    recipe_id: int
+    prompt: str
+    response: str
+    time_saved: datetime
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

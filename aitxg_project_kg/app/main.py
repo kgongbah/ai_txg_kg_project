@@ -4,8 +4,9 @@ from backend.db_setup import engine, database, get_db
 from backend.models import Base, User
 import backend.crud.crud_user as crud_user
 import backend.crud.crud_recipe as crud_recipe
+import backend.crud.crud_recipe_add_text as crud_recipe_add_text
 from middleware import CustomMiddleware
-from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate
+from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate, RecipeAddTextCreate, RecipeAddTextUpdate, RecipeAddTextResponse
 from datetime import datetime
 from typing import Optional, List
 import os
@@ -40,15 +41,21 @@ async def read_root():
 #Create new user
 @app.post("/users/", response_model=UserResponse)
 async def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
+
     existing_user_email = crud_user.get_user_by_email(db, user.email)
     existing_user_username = crud_user.get_user_by_username(db, user.username)
     if existing_user_email:
         raise HTTPException(status_code=400, detail="User with this email already registered.")
     elif existing_user_username:
         raise HTTPException(status_code=400, detail="User with this username already registered.")
+    
     new_user = crud_user.create_user(db, user.username, user.email, user.password, datetime.now())
-    print(f"New user created: user_id: {new_user.user_id}, username: {new_user.username}, email: {new_user.email}")
-    return UserResponse.from_orm(new_user)
+    if not new_user:
+        raise HTTPException(status_code=500, detail="Error creating new user.")
+    else: 
+        print(f"New user created: user_id: {new_user.user_id}, username: {new_user.username}, email: {new_user.email}")
+        return UserResponse.from_orm(new_user)
+    
 
 #Read existing user by user_id
 @app.get("/users/{user_id}", response_model=UserResponse)
@@ -93,6 +100,7 @@ async def delete_existing_user(user_id: int, db: Session = Depends(get_db)):
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User to delete not found.")
     
+    #Loop through all the deleted user's past recipes and delete their images using their image urls
     for recipe in user_to_delete_recipes:
         recipe_url_to_delete = recipe.file_url
         try:
@@ -226,7 +234,87 @@ async def delete_recipe_by_user_id_and_recipe_id(user_id: int, recipe_id: int, d
     print(f"User with user_id {user_id} deleted recipe with recipe_id {recipe_id}: recipe_name: {deleted_recipe.recipe_name}")
     return RecipeResponse.from_orm(deleted_recipe)
 
+##########################################################################################
+# RECIPE ADDITIONAL TEXT API ROUTES
+##########################################################################################
 
+#Create a new recipe additional text (prompt-response pair) by user_id and recipe_id
+@app.post("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/", response_model=RecipeAddTextResponse)
+async def create_new_recipe_add_text(new_recipe_add_text: RecipeAddTextCreate, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+
+    #Define a temporary response for the input prompt. Eventually this will be AWS Sagemaker generated response.
+    temp_response = f"Temporary response for the following prompt: {new_recipe_add_text.prompt}"
+
+    new_recipe_add_text = crud_recipe_add_text.create_new_recipe_add_text(
+        db, 
+        user_id, 
+        recipe_id,
+        new_recipe_add_text.prompt,
+        temp_response,
+        datetime.now()
+        )  
+    
+    if not new_recipe_add_text:
+        raise HTTPException(status_code=500, detail="Error creating new user.")
+    else: 
+        print(f"New recipe_add_text created: user_id: {new_recipe_add_text.user_id}, recipe_id: {new_recipe_add_text.recipe_id}, recipe_add_text_id: {new_recipe_add_text.recipe_add_text_id}")
+        return RecipeAddTextResponse.from_orm(new_recipe_add_text)
+    
+#Get existing recipe additional text by recipe_add_text_id, user_id, and recipe_id
+@app.get("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/{recipe_add_text_id}", response_model=RecipeAddTextResponse)
+async def read_recipe_add_text(recipe_add_text_id: int, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    
+    recipe_add_text_to_read = crud_recipe_add_text.read_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id)
+    if not recipe_add_text_to_read:
+        raise HTTPException(status_code=404, detail=f"Recipe additional text to read with recipe_add_text_id {recipe_add_text_id}, user_id {user_id}, recipe_id {recipe_id} not found.")
+    print(f"Read recipe additional text: recipe_add_text_id: {recipe_add_text_id}, user_id: {recipe_add_text_to_read.user_id}, recipe_id: {recipe_add_text_to_read.recipe_id}")
+    
+    curr_prompt, curr_response = recipe_add_text_to_read.prompt, recipe_add_text_to_read.response
+    prompt_len, response_len = min(8, len(curr_prompt.split(" "))), min(8, len(curr_response.split(" ")))
+    #Print out the first 8 words of the current prompt or response, or if length is less than 8, the total prompt/response
+    print(f"Prompt: {" ".join(curr_prompt.split(" ")[:prompt_len])} - Response: {" ".join(recipe_add_text_to_read.response.split(" ")[:response_len])}")
+    return RecipeAddTextResponse.from_orm(recipe_add_text_to_read)
+
+#Get list of existing recipe additional texts by user_id and recipe_id
+@app.get("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/", response_model=List[RecipeAddTextResponse])
+async def read_all_recipe_add_text(user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    
+    recipe_all_add_text_to_read = crud_recipe_add_text.read_all_recipe_add_text(db, user_id, recipe_id)
+    if not recipe_all_add_text_to_read:
+        raise HTTPException(status_code=404, detail=f"Recipe with user_id {user_id} and recipe_id {recipe_id} has no additional text.")
+    print(f"Read all recipe additional text: user_id: {recipe_all_add_text_to_read[0].user_id}, recipe_id: {recipe_all_add_text_to_read[0].recipe_id}, number of prompt-response pairs: {len(recipe_all_add_text_to_read)}")
+
+    return [RecipeAddTextResponse.from_orm(recipe_add_text) for recipe_add_text in recipe_all_add_text_to_read]
+
+#Update a recipe's response by user_id, recipe_id, and recipe_add_text_id.
+#For now, we can only alter responses. I don't think it makes sense to alter prompts within recalling AWS Sagemaker and generating a new response
+@app.put("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/{recipe_add_text_id}", response_model=RecipeAddTextResponse)
+async def update_recipe_add_text(recipe_add_text_update: RecipeAddTextUpdate, recipe_add_text_id: int, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+
+    recipe_add_text_to_update = crud_recipe_add_text.read_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id)
+    if not recipe_add_text_to_update:
+         raise HTTPException(status_code=404, detail=f"Recipe additional text to update with recipe_add_text_id {recipe_add_text_id}, user_id {user_id}, recipe_id {recipe_id} not found.")
+
+    updated_recipe_add_text = crud_recipe_add_text.update_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id, recipe_add_text_update.prompt)
+
+    if not updated_recipe_add_text:
+        raise HTTPException(status_code=400, detail="Unable to update recipe additional text.")
+    print(f"Recipe additional text with recipe_add_text_id {recipe_add_text_id}, user_id {user_id}, recipe_id {recipe_id} successfully updated.")
+    return RecipeAddTextResponse.from_orm(updated_recipe_add_text)
+
+#Delete recipe additional text by recipe_add_text_id, user_id, and recipe_id
+@app.delete_recipe_additional_text("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/{recipe_add_text_id}", response_model=RecipeAddTextResponse)
+async def delete_recipe_add_text(recipe_add_text_id: int, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
+    recipe_add_text_to_delete = crud_recipe_add_text.read_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id)
+    if not recipe_add_text_to_delete:
+        raise HTTPException(status_code=404, detail=f"Recipe to delete with recipe_add_text_id {recipe_add_text_id}, user_id {user_id}, recipe_id {recipe_id} not found.")
+    
+    deleted_recipe_add_text = crud_recipe_add_text.delete_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id)
+    
+    if not deleted_recipe_add_text:
+        raise HTTPException(status_code=400, detail="Unable to delete recipe additional text.")
+    print(f"Recipe additional text with recipe_add_text_id {recipe_add_text_id}, user_id {user_id}, {recipe_id}: successfully deleted.")
+    return RecipeResponse.from_orm(deleted_recipe_add_text)
 
 
 """
