@@ -13,6 +13,10 @@ class UserBase(BaseModel):
     email: EmailStr
     #time_created: datetime
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 class UserCreate(UserBase):
     username: str
     email: EmailStr

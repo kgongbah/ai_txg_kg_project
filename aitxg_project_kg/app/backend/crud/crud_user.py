@@ -10,6 +10,12 @@ def create_user(db: Session, username: str, email: str, password: str, time_crea
     db.refresh(user)
     return user 
 
+#Verify password when user tries to login
+def verify_password(db: Session, username: str, inputted_password: str):
+    user = get_user_by_username(db, username)
+    user_password = user.password
+    return user_password == inputted_password
+
 #Read user by user_id
 def get_user_by_id(db: Session, user_id: int):
     return db.query(User).filter(User.user_id == user_id).first() #is first necessary

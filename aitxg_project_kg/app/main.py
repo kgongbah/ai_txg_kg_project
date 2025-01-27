@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Form, staticfiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.db_setup import engine, database, get_db
 from backend.models import Base, User
@@ -6,7 +7,7 @@ import backend.crud.crud_user as crud_user
 import backend.crud.crud_recipe as crud_recipe
 import backend.crud.crud_recipe_add_text as crud_recipe_add_text
 from middleware import CustomMiddleware
-from backend.schemas import UserCreate, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate, RecipeAddTextCreate, RecipeAddTextUpdate, RecipeAddTextResponse
+from backend.schemas import UserCreate, LoginRequest, UserResponse, UserUpdate, RecipeCreate, RecipeResponse, RecipeUpdate, RecipeAddTextCreate, RecipeAddTextUpdate, RecipeAddTextResponse
 from datetime import datetime
 from typing import Optional, List
 import os
@@ -27,7 +28,15 @@ app = FastAPI()
 app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
 
 #Add your custom middleware
-app.add_middleware(CustomMiddleware)
+#app.add_middleware(CustomMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Allow requests from your frontend origin
+    allow_credentials=True,  # Allow cookies and authentication headers
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allow all headers (Content-Type, Authorization, etc.)
+)
 
 #Define the root path
 @app.get("/")
@@ -55,6 +64,13 @@ async def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
     else: 
         print(f"New user created: user_id: {new_user.user_id}, username: {new_user.username}, email: {new_user.email}")
         return UserResponse.from_orm(new_user)
+    
+@app.post("/users/login")
+async def login_user(request: LoginRequest, db: Session = Depends(get_db)):
+    user = crud_user.get_user_by_username(db, request.username)
+    if not user or not crud_user.verify_password(db, request.username, request.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {"message": "Login successful", "user_id": user.user_id}
     
 
 #Read existing user by user_id
@@ -125,9 +141,9 @@ async def create_new_recipe_by_user_id(
     user_id: int,
     recipe_name: str = Form(...),
     specifications_text: Optional[str] = Form(None),
-    #recipe_output: str = Form(...),
+    recipe_output: str = Form(...),
     #time_saved: datetime = Form(...),
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(...),
     db: Session = Depends(get_db),
 ):
 
@@ -141,9 +157,6 @@ async def create_new_recipe_by_user_id(
     if recipe_name_exists:
         raise HTTPException(status_code=404, detail=f"User has already created a recipe with this name: {recipe_name}")
     
-    #Temporary definition for recipe_output. 
-    #TODO: Eventually this will be AWS Sagemaker generated text
-    recipe_output = f"recipe_output for {recipe_name}."
 
     #Generate a unique filename
     unique_file_name = f"{uuid4()}_{file.filename}"
@@ -303,7 +316,7 @@ async def update_recipe_add_text(recipe_add_text_update: RecipeAddTextUpdate, re
     return RecipeAddTextResponse.from_orm(updated_recipe_add_text)
 
 #Delete recipe additional text by recipe_add_text_id, user_id, and recipe_id
-@app.delete_recipe_additional_text("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/{recipe_add_text_id}", response_model=RecipeAddTextResponse)
+@app.delete("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/{recipe_add_text_id}", response_model=RecipeAddTextResponse)
 async def delete_recipe_add_text(recipe_add_text_id: int, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
     recipe_add_text_to_delete = crud_recipe_add_text.read_recipe_add_text(db, recipe_add_text_id, user_id, recipe_id)
     if not recipe_add_text_to_delete:
