@@ -78,8 +78,10 @@ class RecipeResponse(RecipeBase):
 ##########################################################################################
 
 class RecipeAddTextBase(BaseModel):
+    # user_id: int
+    # recipe_id: int
     prompt: str
-    # response: str
+    response: str
     # time_saved: datetime
 
 class RecipeAddTextCreate(RecipeAddTextBase):

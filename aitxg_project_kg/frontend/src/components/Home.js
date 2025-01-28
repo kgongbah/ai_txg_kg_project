@@ -1,40 +1,42 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useContext } from "react";
+import { AuthContext } from "./../context/AuthContext";
+import ChatInterface from "./ChatInterface";
 import "./../styles/Home.css";
 
-const Home = () => {
-    const [isSignedIn, setIsSignedIn] = useState(false);
-    //temporarily lock userState as not signed in
-
-    const Header = () => (
-        <header>
-            <h1>Recipe Generator</h1>
-            <Link to="/login-signup">
-                <button className="login-signup-button">Log-in or Sign-up</button>
-            </Link>
-        </header>
-    ); //alert is temporary route for our login
-
-    const NotSignedInContent = () => (
-        <div className = "body">
-            <p>Please log-in or sign-up to start creating recipes.</p>
-        </div>
-    );
-
-    const SignedInContent = () => (
-        <div className="body">
-            <textarea placeholder="Upload an image of your dish and include any speicifications (preferences, dietary restrictions, etc.) you have for your recipe." />
-            <br />
-            <button>Upload Image</button>
-        </div>
-    );
-
+const HomePage = () => {
+    const { user, logout } = useContext(AuthContext);
+  
     return (
-        <div>
-            <Header />
-            {isSignedIn ? <SignedInContent /> : <NotSignedInContent />}
-        </div>
+      <div>
+        <header className="top-bar">
+          <h1>Recipe Generator</h1>
+          <div className="top-bar-actions">
+            {user ? (
+              <>
+                <span className="welcome-message">Hi, {user.username}!</span>
+                <button className="profile-button" onClick={() => (window.location.href = "/profile")}>
+                  Profile
+                </button>
+                <button className="logout-button" onClick={logout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button onClick={() => (window.location.href = "/login-signup")}>
+                Login / Signup
+              </button>
+            )}
+          </div>
+        </header>
+        <main className="main-content">
+            {user ? (
+                <ChatInterface />
+            ) : (
+                <p>Please login or signup to start creating recipes.</p>
+            )}
+        </main>
+      </div>
     );
-};
-
-export default Home;
+  };
+  
+  export default HomePage;

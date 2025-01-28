@@ -143,7 +143,7 @@ async def create_new_recipe_by_user_id(
     specifications_text: Optional[str] = Form(None),
     recipe_output: str = Form(...),
     #time_saved: datetime = Form(...),
-    file: Optional[UploadFile] = File(...),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
 
@@ -157,19 +157,20 @@ async def create_new_recipe_by_user_id(
     if recipe_name_exists:
         raise HTTPException(status_code=404, detail=f"User has already created a recipe with this name: {recipe_name}")
     
+    file_url = None
+    if file:
+        #Generate a unique filename
+        unique_file_name = f"{uuid4()}_{file.filename}"
 
-    #Generate a unique filename
-    unique_file_name = f"{uuid4()}_{file.filename}"
+        #Specify the path where the file will be saved, used internally by CRUD
+        file_path = f"static/uploads/{unique_file_name}"
 
-    #Specify the path where the file will be saved, used internally by CRUD
-    file_path = f"static/uploads/{unique_file_name}"
+        #Specify the file url, used by clients (front-end, APIs)
+        file_url = f"static/uploads/{unique_file_name}"
 
-    #Specify the file url, used by clients (front-end, APIs)
-    file_url = f"static/uploads/{unique_file_name}"
-
-    #Read the file contents and then save to server's file storage
-    with open(file_path, "wb") as buffer: 
-        buffer.write(await file.read())
+        #Read the file contents and then save to server's file storage
+        with open(file_path, "wb") as buffer: 
+            buffer.write(await file.read())
     
     new_recipe = crud_recipe.create_new_recipe(
         db = db,
@@ -255,20 +256,17 @@ async def delete_recipe_by_user_id_and_recipe_id(user_id: int, recipe_id: int, d
 @app.post("/users/{user_id}/recipes/{recipe_id}/recipe_additional_texts/", response_model=RecipeAddTextResponse)
 async def create_new_recipe_add_text(new_recipe_add_text: RecipeAddTextCreate, user_id: int, recipe_id: int, db: Session = Depends(get_db)):
 
-    #Define a temporary response for the input prompt. Eventually this will be AWS Sagemaker generated response.
-    temp_response = f"Temporary response for the following prompt: {new_recipe_add_text.prompt}"
-
     new_recipe_add_text = crud_recipe_add_text.create_new_recipe_add_text(
         db, 
         user_id, 
         recipe_id,
         new_recipe_add_text.prompt,
-        temp_response,
+        new_recipe_add_text.response,
         datetime.now()
         )  
     
     if not new_recipe_add_text:
-        raise HTTPException(status_code=500, detail="Error creating new user.")
+        raise HTTPException(status_code=500, detail="Error creating new recipe additional text.")
     else: 
         print(f"New recipe_add_text created: user_id: {new_recipe_add_text.user_id}, recipe_id: {new_recipe_add_text.recipe_id}, recipe_add_text_id: {new_recipe_add_text.recipe_add_text_id}")
         return RecipeAddTextResponse.from_orm(new_recipe_add_text)
