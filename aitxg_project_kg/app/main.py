@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Optional, List
 import os
 from uuid import uuid4
+import boto3
 
 #Initialize the database
 print("Initializing the database...")
@@ -30,6 +31,8 @@ app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
 #Add your custom middleware
 #app.add_middleware(CustomMiddleware)
 
+print("Applying cors middleware...")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # Allow requests from your frontend origin
@@ -42,6 +45,18 @@ app.add_middleware(
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to Kenny's AITXG project."}
+
+# bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+
+# @app.post("/chat/")
+# async def chat_with_ai(message: str = Form(...), conversation_history: str = Form("")):
+
+#     full_prompt = f"Conversation so far:\n{conversation_history}\n\nUser: {message}\nAI:"
+
+#     payload = {
+#         "prompt": full_prompt,
+#         "max_tokens": 200
+#     }
 
 ##########################################################################################
 # USER API ROUTES
@@ -330,8 +345,8 @@ async def delete_recipe_add_text(recipe_add_text_id: int, user_id: int, recipe_i
 
 """
 Demo steps:
-1. Delete test.db and launch app: uvicorn main:app --host 0.0.0.0 --port 80
-2. Go to http://localhost:80/docs
+1. Delete test.db and launch app: uvicorn main:app --host 0.0.0.0 --port 8000
+2. Go to http://localhost:8000/docs
 3. Add a new user
 4. Try adding a new user with the same username -> look at error message
 5. Try adding a new user with the same email -> look at error message
@@ -341,7 +356,7 @@ Demo steps:
     2. .open test.db
     3. select * from users;
 8. You should be able to see your new users
-9. .exit and run app again: uvicorn main:app --host 0.0.0.0 --port 80
+9. .exit and run app again: uvicorn main:app --host 0.0.0.0 --port 8000
 10. Try to update user where user_id = 1, change username, set email and password to null
 11. Try to delete user where user_id = 1
 """

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Home from './components/Home';
 import LoginSignup from './components/LoginSignup';
 import ChatInterface from './components/ChatInterface';
+import Profile from './components/Profile'
 import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
             <Route exact path="/" element={<Home />} />
             <Route path="/login-signup" element={<LoginSignup />} />
             <Route path="/chat" element={<ChatInterface />} />
+            
           </Routes> 
         </div>
       </Router>

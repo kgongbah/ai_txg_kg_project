@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import api from "./../services/api";
 import "./../styles/LoginSignup.css";
-import axios from "axios";
 
 const LoginSignup = () => {
   const [isLogin, setIsLogin] = useState(true); // Toggle between login and signup
@@ -12,21 +10,30 @@ const LoginSignup = () => {
   });
   const [message, setMessage] = useState("");
 
+  //Backend API
+  const api = "http://localhost:8000";
+
+  //This formatting is a bit weird, but in the HTML, any input that is submitted (ie email, username, or password)
+  //has a name and value property. e.target refers to the entire input field. name refers to either email, username,
+  //or password. value is the value of the name, ie name = email, value = kg@gmail.com
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
+    //Above line is equivalent to:
+    //const name = e.target.name;
+    //const value = e.target.value;
+    setFormData({ 
+      ...formData, //Keeps unedited portion of form
+      [name]: value, //Updates edited value of the form
     });
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); //Prevents page refresh when form is submitted.
+
     try {
-        console.log("hi1")
       if (isLogin) {
         // Login logic
-        const response = await fetch("http://localhost:80/users/login", {
+        const response = await fetch(`${api}/users/login`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({
@@ -34,13 +41,14 @@ const LoginSignup = () => {
                 password: formData.password,
             }),
         });
-        console.log("hewo")
 
         // Handle successful login (e.g., store token in localStorage)
         if (response.ok) {
             const data = await response.json(); //For some reason data only gives us the user_id
-            const logged_in_user = await fetch(`http://localhost:80/users/${data.user_id}`); //Get the username and other info
+            const logged_in_user = await fetch(`${api}/users/${data.user_id}`); //Get the username and other info
             const logged_user_data = await logged_in_user.json();
+
+            //localStorage is 
             localStorage.setItem("user_id", logged_user_data.user_id);
             localStorage.setItem("username", logged_user_data.username); // Optional, for greeting
             
@@ -54,7 +62,7 @@ const LoginSignup = () => {
         };
       } else {
         // Signup logic
-        const response = await fetch("http://localhost:80/users/", {
+        const response = await fetch(`${api}/users/`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -74,6 +82,7 @@ const LoginSignup = () => {
     }
   };
 
+  //Note: whenever any of the forms are changed, the onChange property calls handleChange
   return (
     <div className="login-signup-container">
       <h2>{isLogin ? "Login" : "Signup"}</h2>
